@@ -6,7 +6,6 @@ import requests
 from googleapiclient.discovery import build
 from google.oauth2 import service_account
 from googleapiclient.http import MediaFileUpload
-from googleapiclient import errors
 
 from fuzzywuzzy import process
 

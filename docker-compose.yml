@@ -1,10 +1,10 @@
+version: '3.8'
+
 services:
-  app:
-    build:
-      context: .
-      dockerfile: DockerFile
-    container_name: stable_mail_processor
+  stable-mail-processor:
+    build: .
+    volumes:
+      - .:/app
     env_file:
-      - ./.env
-    command: ["python3.12", "src/main.py"]
-    ipc: host
+      - .env
+    restart: unless-stopped
