@@ -1,0 +1,5 @@
+python-dotenv==1.0.1
+google-api-python-client==2.161.0
+fuzzywuzzy==0.18.0
+python-Levenshtein==0.26.1
+requests==2.32.3
