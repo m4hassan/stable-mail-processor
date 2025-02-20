@@ -21,17 +21,15 @@ def process_mail_items():
         mail_id = item["node"]["id"]
 
         if mail_id in processed_mail_ids:
-            print(f"Mail ID: {mail_id} already processed. Skipping...")
+            logger.info(f"Mail ID: {mail_id} already processed. Skipping...")
             continue
 
         recipient_name = extract_recipient_name(item)
-        print(f"Processing mail ID: {mail_id}, Recipient Name: {recipient_name}")
+        logger.info(f"Processing mail ID: {mail_id}, Recipient Name: {recipient_name}")
 
         # fetch mail content pdf url
         pdf_url = item["node"]["scanDetails"]["imageUrl"]
-        # pdf_filename = f"{mail_id}.pdf"
-        # pdf_save_path = os.path.join('pdfs', pdf_filename)
-        # downloaded_pdf_path = download_pdf(pdf_url, pdf_save_path)
+
 
         if pdf_url:
             recipient_folder_id = fuzzy_search_or_create_folder(recipient_name)
@@ -42,7 +40,7 @@ def process_mail_items():
                 save_processed_mail_id(mail_id)
 
         else:
-            print(f"Failed to process Mail ID: {mail_id} due to null pdf url.")
+            logger.error(f"Failed to process Mail ID: {mail_id} due to null pdf url.")
 
 
 if __name__ == '__main__':

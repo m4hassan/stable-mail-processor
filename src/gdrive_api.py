@@ -1,5 +1,6 @@
-import io
+import os
 import logging
+import tempfile
 
 import requests
 from googleapiclient.discovery import build
@@ -89,11 +90,11 @@ def fuzzy_search_or_create_folder(recipient_name, threshold=80):
 
 def upload_to_google_drive(mail_id, pdf_url, recipient_name, recipient_folder_id):
     """
-    Uploads a PDF file to Google Drive under the specified folder.
+    Downloads a PDF file to a temporary location and uploads it to Google Drive under the specified folder.
 
     Args:
-        mail_id (str): ID of the mail item
-        pdf_url (str): Local path to the PDF file.
+        mail_id (str): ID of the mail item.
+        pdf_url (str): URL of the PDF file to download.
         recipient_name (str): The name of the folder to upload to.
         recipient_folder_id (str): The ID of the folder in Google Drive where the file should be uploaded.
 
@@ -107,23 +108,31 @@ def upload_to_google_drive(mail_id, pdf_url, recipient_name, recipient_folder_id
         logger.error(f"Error downloading file: {pdf_url}")
         return None
 
-    # Create a file-like object from the downloaded content
-    pdf_file = io.BytesIO(response.content)
-
-    file_metadata = {
-        "name": file_name,
-        "parents": [recipient_folder_id],
-    }
-    media = MediaFileUpload(filename=pdf_file,
-                            mimetype='application/pdf',
-                            resumable=True)
     try:
-        file = service.files().create(body=file_metadata,
-                                      media_body=media,
-                                      fields="id").execute()
-        logger.info(f"Uploaded '{file_name}' to '{recipient_name}'.")
-        return file.get("id")
+        # Create a temporary file
+        with tempfile.NamedTemporaryFile() as temp_file:
+            temp_file.write(response.content)
+            temp_file_path = temp_file.name  # Save the temp file path
 
-    except errors.HttpError as error:
-        logger.error(f"Error uploading file: '{file_name}': {error}")
+            file_metadata = {
+                "name": file_name,
+                "parents": [recipient_folder_id],
+            }
+            media = MediaFileUpload(temp_file_path, mimetype="application/pdf", resumable=True)
+
+            file = service.files().create(body=file_metadata, media_body=media, fields="id").execute()
+            logger.info(f"Uploaded '{file_name}' to '{recipient_name}'.")
+
+            return file.get("id")
+
+    except Exception as error:
+        logger.error(f"Error in Temp file : {error}")
         return None
+
+    finally:
+        # Clean up: Delete the temporary file
+        try:
+            if os.path.exists(temp_file_path):
+                os.remove(temp_file_path)
+        except Exception as e:
+            logger.warning(f"Could not delete temporary file {temp_file_path}: {e}")

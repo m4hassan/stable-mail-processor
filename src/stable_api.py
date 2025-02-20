@@ -24,7 +24,7 @@ def fetch_mail_items(status="completed"):
     }
     params = {
         "scan.status": status,
-        "first": 2,
+        "first": 4,
     }
     response = requests.get(url, headers=headers, params=params)
 

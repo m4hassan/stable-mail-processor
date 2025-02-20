@@ -1,0 +1,10 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: DockerFile
+    container_name: stable_mail_processor
+    env_file:
+      - ./.env
+    command: ["python3.12", "src/main.py"]
+    ipc: host
