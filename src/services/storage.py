@@ -23,9 +23,4 @@ class SupabaseDatabase(DatabaseService):
             self.client.table("processed_mails").insert(data).execute()
             logger.info(f"Mail ID '{mail_id}' saved successfully.")
         except Exception as e:
-            if "duplicate" in str(e).lower() or "unique" in str(e).lower():
-                logger.warning(
-                    f"Mail ID '{mail_id}' already exists in processed mail IDs"
-                )
-            else:
-                logger.error(f"Error inserting processed mail id '{mail_id}': {e}")
+            logger.error(f"Error inserting processed mail id '{mail_id}': {e}")
