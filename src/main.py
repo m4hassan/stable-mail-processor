@@ -1,13 +1,10 @@
-import os
-from pathlib import Path
-
 import requests
 
-from config import STABLE_API_KEY, STABLE_API_URL
+from config import STABLE_API_KEY, STABLE_API_URL, SUPABASE_URL, SUPABASE_KEY
 from logger import get_logger
 from services.google_drive import GoogleDriveService
-from services.sqlite_db import SQLiteDatabase
 from services.stable_mail import StableMailService
+from services.storage import SupabaseDatabase
 
 logger = get_logger()
 
@@ -49,7 +46,7 @@ def process_mail_items(drive_service, db_service, mail_service):
                     file_name, response.content, folder_id
                 )
                 if uploaded_file_id:
-                    db_service.save_processed_mail_id(mail_id)
+                    db_service.save_processed_mail_id(mail_id, recipient_name)
             else:
                 logger.error(f"Failed to download PDF for Mail ID: {mail_id}")
         else:
@@ -57,10 +54,9 @@ def process_mail_items(drive_service, db_service, mail_service):
 
 
 if __name__ == "__main__":
-    db_path = os.path.join(Path(__file__).parent.parent, "db.sqlite3")
 
     drive_service = GoogleDriveService()
-    db_service = SQLiteDatabase(db_path)
+    db_service = SupabaseDatabase(SUPABASE_URL, SUPABASE_KEY)
     mail_service = StableMailService(STABLE_API_KEY, STABLE_API_URL)
 
     process_mail_items(drive_service, db_service, mail_service)
