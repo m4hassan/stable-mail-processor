@@ -166,3 +166,4 @@ cython_debug/
 temp
 /data
 .vscode
+secrets.json

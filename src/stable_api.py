@@ -1,4 +1,5 @@
 import logging
+
 import requests
 
 from config import STABLE_API_KEY, STABLE_API_URL
@@ -7,33 +8,38 @@ logger = logging.getLogger(__name__)
 
 
 def fetch_mail_items(status="completed"):
-    """
-    Fetch mail items from the Stable API with the given scan status.
+    URL = f"{STABLE_API_URL}/v1/mail-items"
+    headers = {"accept": "application/json", "x-api-key": STABLE_API_KEY}
+    params = {"scan.status": status, "first": 50}  # Fetch 50 items per request
+    all_items = []
 
-    Args:
-        status (str): The scan status of the mail items to fetch. Default is 'completed'.
+    print("Starting mail items fetch...")
 
-    Returns:
-        list: A list of mail item dictionaries.
-    """
-    url = f"{STABLE_API_URL}/"
+    while True:
+        print(f"Fetching mail items with params: {params}")
+        response = requests.get(URL, headers=headers, params=params)
 
-    headers = {
-        "accept": "application/json",
-        "x-api-key": STABLE_API_KEY
-    }
-    params = {
-        "scan.status": status,
-        "first": 4,
-    }
-    response = requests.get(url, headers=headers, params=params)
+        if response.status_code != 200:
+            print(
+                f"Error fetching mail items: {response.status_code} - {response.text}"
+            )
+            return all_items
 
-    if response.status_code != 200:
-        print(f"Error fetching mail items: {response.status_code} - {response.text}")
-        return []
+        data = response.json()
+        fetched_items = data.get("edges", [])
+        all_items.extend(fetched_items)
+        print(f"Fetched {len(fetched_items)} items, total so far: {len(all_items)}")
 
-    data = response.json()
-    return data.get("edges", [])
+        page_info = data.get("pageInfo", {})
+        if not page_info.get("hasNextPage"):
+            print("No more pages left to fetch.")
+            break  # Stop if there are no more pages
+
+        params["after"] = page_info.get("endCursor")  # Move to the next page
+        print(f"Moving to next page with cursor: {params['after']}")
+
+    print(f"Completed fetching mail items. Total items retrieved: {len(all_items)}")
+    return all_items
 
 
 def extract_recipient_name(mail_item):
@@ -46,6 +52,10 @@ def extract_recipient_name(mail_item):
     Returns:
         str: The recipient's name.
     """
-    recipient = mail_item.get("node", {}).get("recipients", {}).get("line1", {}).get("text", "Unknown Recipient")
+    recipient = (
+        mail_item.get("node", {})
+        .get("recipients", {})
+        .get("line1", {})
+        .get("text", "Unknown Recipient")
+    )
     return recipient
-

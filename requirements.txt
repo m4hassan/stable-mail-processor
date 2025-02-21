@@ -3,3 +3,6 @@ google-api-python-client==2.161.0
 fuzzywuzzy==0.18.0
 python-Levenshtein==0.26.1
 requests==2.32.3
+black==25.1.0
+isort==6.0.0
+loguru==0.7.3
