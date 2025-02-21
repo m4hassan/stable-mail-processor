@@ -96,19 +96,28 @@ class GoogleDriveService(DriveService):
         try:
             page_token = None
             while True:
-                query = "mimeType='application/vnd.google-apps.folder' and trashed=false"
-                response = self.service.files().list(q=query,
-                                                     spaces="drive",
-                                                     fields="nextPageToken, files(id, name)",
-                                                     pageToken=page_token,
-                                                     ).execute()
+                query = (
+                    "mimeType='application/vnd.google-apps.folder' and trashed=false"
+                )
+                response = (
+                    self.service.files()
+                    .list(
+                        q=query,
+                        spaces="drive",
+                        fields="nextPageToken, files(id, name)",
+                        pageToken=page_token,
+                    )
+                    .execute()
+                )
                 folders = response.get("files", [])
                 for folder in folders:
                     try:
                         self.service.files().delete(fileId=folder["id"]).execute()
                         logger.info(f"Moved folder to trash: {folder['name']}")
                     except Exception as error:
-                        logger.error(f"Error moving folder to trash: {folder['name']} - {error}")
+                        logger.error(
+                            f"Error moving folder to trash: {folder['name']} - {error}"
+                        )
 
                 page_token = response.get("nextPageToken", None)
                 if not page_token:
@@ -118,5 +127,3 @@ class GoogleDriveService(DriveService):
             return None
 
         return True
-
-
