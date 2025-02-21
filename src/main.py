@@ -1,6 +1,9 @@
 import requests
 
-from config import STABLE_API_KEY, STABLE_API_URL, SUPABASE_URL, SUPABASE_KEY
+from config import STABLE_API_KEY
+from config import STABLE_API_URL
+from config import SUPABASE_URL
+from config import SUPABASE_KEY
 from logger import get_logger
 from services.google_drive import GoogleDriveService
 from services.stable_mail import StableMailService
@@ -36,7 +39,6 @@ def process_mail_items(drive_service, db_service, mail_service):
 
             response = requests.get(pdf_url)
             if response.status_code == 200:
-                # Add recipient name to filename when saving to default folder
                 file_name = (
                     f"{recipient_name}_{mail_id}.pdf" if not matched
                     else f"{mail_id}.pdf"

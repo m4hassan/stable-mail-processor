@@ -4,6 +4,7 @@ from . import DatabaseService
 
 logger = get_logger()
 
+
 class SupabaseDatabase(DatabaseService):
     def __init__(self, supabase_url: str, supabase_key: str):
         self.client: Client = create_client(supabase_url, supabase_key)
@@ -18,14 +19,13 @@ class SupabaseDatabase(DatabaseService):
 
     def save_processed_mail_id(self, mail_id, recipient_name):
         try:
-            data = {"mail_id": mail_id,
-                    "recipient_name": recipient_name}
+            data = {"mail_id": mail_id, "recipient_name": recipient_name}
             self.client.table("processed_mails").insert(data).execute()
             logger.info(f"Mail ID '{mail_id}' saved successfully.")
         except Exception as e:
             if "duplicate" in str(e).lower() or "unique" in str(e).lower():
                 logger.warning(
-                    f"Mail ID '{mail_id}' already exists in processed mail IDs")
+                    f"Mail ID '{mail_id}' already exists in processed mail IDs"
+                )
             else:
                 logger.error(f"Error inserting processed mail id '{mail_id}': {e}")
-
