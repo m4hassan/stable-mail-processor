@@ -29,8 +29,8 @@ def process_mail_items(drive_service, db_service, mail_service):
         pdf_url = item["node"]["scanDetails"]["imageUrl"]
 
         if pdf_url:
-            folder_id, matched = drive_service.fuzzy_search_or_create_folder(recipient_name)
-            
+            folder_id, matched = drive_service.fuzzy_search(recipient_name)
+
             if not matched:
                 logger.warning(
                     f"No matching folder found for '{recipient_name}'. "
@@ -44,7 +44,7 @@ def process_mail_items(drive_service, db_service, mail_service):
                     f"{recipient_name}_{mail_id}.pdf" if not matched
                     else f"{mail_id}.pdf"
                 )
-                
+
                 uploaded_file_id = drive_service.upload_file(
                     file_name, response.content, folder_id
                 )

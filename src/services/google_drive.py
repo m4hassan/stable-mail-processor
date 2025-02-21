@@ -15,7 +15,7 @@ logger = get_logger()
 
 class GoogleDriveService(DriveService):
     DEFAULT_FOLDER_NAME = "Unmatched Court Documents"
-    
+
     def __init__(self):
         ROOT_DIR = Path(__file__).resolve().parent.parent.parent
         SCOPE = ["https://www.googleapis.com/auth/drive"]
@@ -34,7 +34,7 @@ class GoogleDriveService(DriveService):
             if folder["name"] == self.DEFAULT_FOLDER_NAME:
                 self._default_folder_id = folder["id"]
                 return
-                
+
         # Create if doesn't exist
         self._default_folder_id = self.create_folder(self.DEFAULT_FOLDER_NAME)
         logger.info(f"Created default folder '{self.DEFAULT_FOLDER_NAME}'")
@@ -77,7 +77,7 @@ class GoogleDriveService(DriveService):
             logger.error(f"Error uploading file: {error}")
             return None
 
-    def fuzzy_search_or_create_folder(self, folder_name, threshold=80):
+    def fuzzy_search(self, folder_name, threshold=80):
         folders = self.list_folders()
         folder_map = {folder["name"]: folder["id"] for folder in folders}
 
@@ -87,5 +87,36 @@ class GoogleDriveService(DriveService):
                 logger.info(f"Found matching folder '{best_match}' with score {score}")
                 return folder_map[best_match], True
 
-        logger.info(f"No match found for '{folder_name}', using default folder")
         return self._default_folder_id, False
+
+    def delete_all_folders(self):
+        """
+        Moves all folders in the user's Google Drive to the trash.
+        """
+        try:
+            page_token = None
+            while True:
+                query = "mimeType='application/vnd.google-apps.folder' and trashed=false"
+                response = self.service.files().list(q=query,
+                                                     spaces="drive",
+                                                     fields="nextPageToken, files(id, name)",
+                                                     pageToken=page_token,
+                                                     ).execute()
+                folders = response.get("files", [])
+                for folder in folders:
+                    try:
+                        self.service.files().delete(fileId=folder["id"]).execute()
+                        logger.info(f"Moved folder to trash: {folder['name']}")
+                    except Exception as error:
+                        logger.error(f"Error moving folder to trash: {folder['name']} - {error}")
+
+                page_token = response.get("nextPageToken", None)
+                if not page_token:
+                    break
+        except Exception as error:
+            logger.error(f"An error occurred while listing folders: {error}")
+            return None
+
+        return True
+
+
