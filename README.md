@@ -61,7 +61,7 @@ docker-compose up --build
 │ ├── services/
 │ │ ├── init.py
 │ │ ├── google_drive.py
-│ │ ├── sqlite_db.py
+│ │ ├── storage.py
 │ │ └── stable_mail.py
 │ ├── config.py
 │ └── main.py
