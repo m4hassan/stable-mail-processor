@@ -1,49 +1,64 @@
-import sys
-import logging
+import requests
 
-from stable_api import fetch_mail_items, extract_recipient_name
-from gdrive_api import fuzzy_search_or_create_folder, upload_to_google_drive
-from db_utils import load_processed_mail_ids, save_processed_mail_id
+from config import STABLE_API_KEY
+from config import STABLE_API_URL
+from config import SUPABASE_URL
+from config import SUPABASE_KEY
+from logger import get_logger
+from services.google_drive import GoogleDriveService
+from services.stable_mail import StableMailService
+from services.storage import SupabaseDatabase
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(levelname)s - %(message)s",
-    handlers=[logging.StreamHandler(sys.stdout)],
-)
-logger = logging.getLogger()
+logger = get_logger()
 
 
-def process_mail_items():
-    mail_items = fetch_mail_items()
-    processed_mail_ids = load_processed_mail_ids()
+def process_mail_items(drive_service, db_service, mail_service):
+    mail_items = mail_service.fetch_mail_items()
+    processed_mail_ids = db_service.get_processed_mail_ids()
 
     for item in mail_items:
         mail_id = item["node"]["id"]
 
         if mail_id in processed_mail_ids:
-            print(f"Mail ID: {mail_id} already processed. Skipping...")
+            logger.info(f"Mail ID: {mail_id} already processed. Skipping...")
             continue
 
-        recipient_name = extract_recipient_name(item)
-        print(f"Processing mail ID: {mail_id}, Recipient Name: {recipient_name}")
+        recipient_name = mail_service.extract_recipient_name(item)
+        logger.info(f"Processing mail ID: {mail_id}, Recipient Name: {recipient_name}")
 
-        # fetch mail content pdf url
         pdf_url = item["node"]["scanDetails"]["imageUrl"]
-        # pdf_filename = f"{mail_id}.pdf"
-        # pdf_save_path = os.path.join('pdfs', pdf_filename)
-        # downloaded_pdf_path = download_pdf(pdf_url, pdf_save_path)
 
         if pdf_url:
-            recipient_folder_id = fuzzy_search_or_create_folder(recipient_name)
+            folder_id, matched = drive_service.fuzzy_search(recipient_name)
 
-            uploaded_file_id = upload_to_google_drive(mail_id, pdf_url, recipient_name, recipient_folder_id)
-            if uploaded_file_id:
-                # save mail ID after successful processing
-                save_processed_mail_id(mail_id)
+            if not matched:
+                logger.warning(
+                    f"No matching folder found for '{recipient_name}'. "
+                    "Document will be saved in the default folder."
+                )
 
+            response = requests.get(pdf_url)
+            if response.status_code == 200:
+                file_name = (
+                    f"{recipient_name}_{mail_id}.pdf" if not matched
+                    else f"{mail_id}.pdf"
+                )
+
+                uploaded_file_id = drive_service.upload_file(
+                    file_name, response.content, folder_id
+                )
+                if uploaded_file_id:
+                    db_service.save_processed_mail_id(mail_id, recipient_name)
+            else:
+                logger.error(f"Failed to download PDF for Mail ID: {mail_id}")
         else:
-            print(f"Failed to process Mail ID: {mail_id} due to null pdf url.")
+            logger.error(f"Failed to process Mail ID: {mail_id} due to null pdf url.")
 
 
-if __name__ == '__main__':
-    process_mail_items()
+if __name__ == "__main__":
+
+    drive_service = GoogleDriveService()
+    db_service = SupabaseDatabase(SUPABASE_URL, SUPABASE_KEY)
+    mail_service = StableMailService(STABLE_API_KEY, STABLE_API_URL)
+
+    process_mail_items(drive_service, db_service, mail_service)
