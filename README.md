@@ -38,6 +38,8 @@ This application processes mail items from the Stable API, uploads their scanned
     Create a `.env` file with:
     ``` bash
     STABLE_API_KEY=your_stable_api_key
+    SUPABASE_URL=your_supabase_url
+    SUPABASE_KEY=your_supbase_key
     ```
 5. Set up Google Drive API:
    - Place your Google Cloud service account key in `secrets.json`
