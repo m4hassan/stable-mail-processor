@@ -2,11 +2,7 @@ from abc import ABC, abstractmethod
 
 class DriveService(ABC):
     @abstractmethod
-    def list_folders(self):
-        pass
-
-    @abstractmethod
-    def create_folder(self, folder_name):
+    def list_folders_recursively(self, parent_folder_id):
         pass
 
     @abstractmethod

@@ -1,7 +1,7 @@
 import tempfile
 from pathlib import Path
 
-from fuzzywuzzy import process
+from rapidfuzz import process, fuzz, utils
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
@@ -9,6 +9,8 @@ from googleapiclient.http import MediaFileUpload
 from logger import get_logger
 
 from . import DriveService
+
+from config import DRAFT_LAWSUIT_PACKETS_ALL_ID
 
 logger = get_logger()
 
@@ -25,32 +27,40 @@ class GoogleDriveService(DriveService):
             filename=SERVICE_ACCOUNT_JSON_KEY, scopes=SCOPE
         )
         self.service = build("drive", "v3", credentials=creds)
-        self._ensure_default_folder_exists()
 
-    def _ensure_default_folder_exists(self):
-        """Ensures the default folder for unmatched documents exists"""
-        folders = self.list_folders()
-        for folder in folders:
-            if folder["name"] == self.DEFAULT_FOLDER_NAME:
-                self._default_folder_id = folder["id"]
-                return
+    def list_folders_recursively(self, parent_folder_id):
+        """
+        Recursively lists all folders under the given parent folder.
+        """
+        all_folders = []
+        query = f"mimeType='application/vnd.google-apps.folder' and '{parent_folder_id}' in parents and trashed=false"
+        page_token = None
 
-        # Create if doesn't exist
-        self._default_folder_id = self.create_folder(self.DEFAULT_FOLDER_NAME)
-        logger.info(f"Created default folder '{self.DEFAULT_FOLDER_NAME}'")
+        while True:
+            results = (
+                self.service.files()
+                .list(
+                    q=query,
+                    fields="nextPageToken, files(id, name)",
+                    pageToken=page_token,
+                    includeItemsFromAllDrives=True,
+                    supportsAllDrives=True,
+                )
+                .execute()
+            )
+            
+            folders = results.get("files", [])
+            all_folders.extend(folders)
+            
+            for folder in folders:
+                subfolders = self.list_folders_recursively(folder["id"])
+                all_folders.extend(subfolders)
 
-    def list_folders(self):
-        query = "mimeType='application/vnd.google-apps.folder' and trashed=false"
-        results = self.service.files().list(q=query, fields="files(id, name)").execute()
-        return results.get("files", [])
-
-    def create_folder(self, folder_name):
-        file_metadata = {
-            "name": folder_name,
-            "mimeType": "application/vnd.google-apps.folder",
-        }
-        folder = self.service.files().create(body=file_metadata, fields="id").execute()
-        return folder.get("id")
+            page_token = results.get("nextPageToken", None)
+            if not page_token:
+                break
+        
+        return all_folders
 
     def upload_file(self, file_name, file_content, folder_id):
         try:
@@ -77,28 +87,48 @@ class GoogleDriveService(DriveService):
             logger.error(f"Error uploading file: {error}")
             return None
 
-    def fuzzy_search(self, folder_name, threshold=80):
-        folders = self.list_folders()
-        folder_map = {folder["name"]: folder["id"] for folder in folders}
+    def fuzzy_search(self, folders_list, folder_name, threshold=90):
+        """
+        Recursively searches in the DRAFT_LAWSUIT_PACKETS_ALL folder for a folder
+        that fuzzy-matches the recipient's name. If a unique match is found, return its ID.
+        If multiple valid matches are found (or none), return the default folder ID.
+        """
+        folder_map = {folder["name"]: folder["id"] for folder in folders_list}
 
-        if folder_map:
-            best_match, score = process.extractOne(folder_name, list(folder_map.keys()))  # type: ignore
-            if score >= threshold:
-                logger.info(f"Found matching folder '{best_match}' with score {score}")
-                return folder_map[best_match], True
+        if not folder_map:
+            logger.warning("No subfolders found in the DRAFT_LAWSUIT_PACKETS_ALL folder. defaulting to UNMATCHED_COURT_DOCUMENTS")
+            return self.DEFAULT_FOLDER_NAME, False
 
-        return self._default_folder_id, False
+        matches = process.extract(folder_name, 
+                                  list(folder_map.keys()),
+                                  processor=utils.default_process,
+                                  scorer=fuzz.WRatio)
+        
+        valid_matches = [(name, score) for name, score, _ in matches if score >= threshold]
+
+        if len(valid_matches) == 1:
+            best_match, score = valid_matches[0]
+            logger.info(f"Unique matching folder '{best_match}' found with score {score}")
+            return folder_map[best_match], True
+        
+        else:
+            if valid_matches:
+                logger.warning(f"Multiple matching folders found for '{folder_name}': {[n for n, s in valid_matches]}. "
+                               "Using default folder.")
+            else:
+                logger.warning(f"No matching folders found for '{folder_name}'. Using default folder.")
+            
+            return self.DEFAULT_FOLDER_NAME, False
 
     def delete_all_folders(self):
         """
         Moves all folders in the user's Google Drive to the trash.
+        Warning: use it with caution as it will delete all the data from the drive.
         """
         try:
             page_token = None
             while True:
-                query = (
-                    "mimeType='application/vnd.google-apps.folder' and trashed=false"
-                )
+                query = f"mimeType='application/vnd.google-apps.folder' and '{DRAFT_LAWSUIT_PACKETS_ALL_ID}' in parents and trashed=false"
                 response = (
                     self.service.files()
                     .list(

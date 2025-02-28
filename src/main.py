@@ -4,10 +4,13 @@ from config import STABLE_API_KEY
 from config import STABLE_API_URL
 from config import SUPABASE_URL
 from config import SUPABASE_KEY
-from logger import get_logger
+from config import DRAFT_LAWSUIT_PACKETS_ALL_ID
+
 from services.google_drive import GoogleDriveService
 from services.stable_mail import StableMailService
 from services.storage import SupabaseDatabase
+
+from logger import get_logger
 
 logger = get_logger()
 
@@ -15,6 +18,8 @@ logger = get_logger()
 def process_mail_items(drive_service, db_service, mail_service):
     mail_items = mail_service.fetch_mail_items()
     processed_mail_ids = db_service.get_processed_mail_ids()
+
+    folders_list = drive_service.list_folders_recursively(DRAFT_LAWSUIT_PACKETS_ALL_ID)
 
     for item in mail_items:
         mail_id = item["node"]["id"]
@@ -29,7 +34,7 @@ def process_mail_items(drive_service, db_service, mail_service):
         pdf_url = item["node"]["scanDetails"]["imageUrl"]
 
         if pdf_url:
-            folder_id, matched = drive_service.fuzzy_search(recipient_name)
+            folder_id, matched = drive_service.fuzzy_search(folders_list, recipient_name)
 
             if not matched:
                 logger.warning(
