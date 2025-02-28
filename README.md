@@ -37,6 +37,8 @@ This application processes mail items from the Stable API, uploads their scanned
    
     Create a `.env` file with:
     ``` bash
+    UNMATCHED_COURT_DOCUMENTS = your_default_folder_for_unmatched_documents
+    DRAFT_LAWSUIT_PACKETS_ALL_ID=your_parent_folder_id
     STABLE_API_KEY=your_stable_api_key
     SUPABASE_URL=your_supabase_url
     SUPABASE_KEY=your_supbase_key
